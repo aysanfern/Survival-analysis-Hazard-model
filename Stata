@@ -1,0 +1,125 @@
+/*To retrieve the data set*/
+
+use ---------------------
+
+/*set the data as survival data*/
+
+stset time, fail(died)
+
+/*perform a weibull regression on each of the variables*/
+
+streg nodes, dist(weibull)
+streg age, dist(weibull) nohr
+streg hormone, dist(weibull) nohr
+streg progesterone, dist(weibull) nohr
+streg estrogen, dist(weibull) nohr
+streg size, dist(weibull) nohr
+streg grade, dist(weibull) nohr
+
+/*collect information about the outcome and predictor variables*/
+
+tab died
+tab hormone
+sum age
+tab grade
+sum size
+sum nodes
+sum progesterone
+sum estrogen
+
+/* generating categorical variables for continuous to check the log log plots*/
+
+summ nodes, detail
+summ size, detail
+summ estrogen, detail
+summ progesterone, detail
+summ age, detail
+recode age (min/46=1)(46/53=2)(53/62=3)(62/max=4), gen(agegrp)
+recode size(min/20=1)(20/25=2)(25/35=3)(35/max=4), gen(sizegrp)
+recode progesterone (min/8=1)(8/33=2)(33/136.5=3)(136.5/max=4), gen(progesteronegrp)
+recode estrogen (min/8=1)(8/35.5=2)(35.5/118=3)(118/max=4), gen(estrogengrp)
+recode nodes (min/1=1)(1/3=2)(3/6=3)(6/max=4), gen(nodesgrp)
+
+/* perform log log plots*/
+
+stphplot, by(sizegrp) noneg name(size)
+stphplot, by(nodesgrp) noneg name(nodes)
+stphplot, by(estrogengrp) noneg name(estrogen)
+stphplot, by(progesteronegrp) noneg name(progesterone)
+stphplot, by(agegrp) noneg name(age)
+stphplot, by(hormone) noneg name(hormone)
+stphplot, by(grade) noneg name(grade)
+
+/*combine all of the graphs into one page*/
+
+graph combine size nodes estrogen progesterone age grade hormone,  iscale(0.3) name(loglog)
+
+/*create a variable for each level of tumour grades*/
+
+tab grade, gen(grade)
+
+/*perform cox regression on each of the variables*/
+
+stcox nodes
+stcox age
+stcox hormone
+stcox size
+stcox estrogen
+stcox progesterone
+stcox grade2 grade3
+stcox nodes, nohr
+stcox age, nohr
+stcox hormone, nohr
+stcox size, nohr
+stcox estrogen, nohr
+stcox progesterone, nohr
+stcox grade2 grade3, nohr
+
+/*compare a spline model of estrogen to a linear*/
+
+stcox estrogen
+est store A
+predict fitLine1, xb
+lab var fitLine1 “Linear”
+summ estrogen, detail
+gen estrogen1= (estrogen-8)*(estrogen>8)
+gen estrogen2= (estrogen-35.5)*(estrogen>35.5)
+gen estrogen3= (estrogen-118)*(estrogen>118)
+stcox estrogen estrogen1 estrogen2 estrogen3
+lrtest A
+
+/*create a spline graph with the linear graph to visually compare*/
+
+predict fitSpline1, xb
+lab var fitSpline1 “Spline”
+line fitLine1 fitSpline1 estrogen, sort name(estrogen2)
+
+/*compare a spline model of age to a linear model of age*/
+
+stcox age
+est store A
+predict fitLine2, xb
+lab var fitLine2 “Linear”
+summ age, detail
+gen age1= (age-46)*(age>46)
+gen age2= (age-53)*(age>53)
+gen age3= (age-62)*(age>62)
+stcox age age1 age2 age3
+lrtest A
+
+/*create an age spline graph with the linear graph to visually compare*/
+
+predict fitSpline2, xb
+lab var fitSpline2 “Spline”
+line fitLine2 fitSpline2 age, sort name(age2)
+
+/*create a combined graph of age and estrogen*/
+
+graph combine age2 estrogen2,  iscale(1)
+
+/*performing a stcox multivariable model*/
+
+stcox hormone grade2 grade3 size progesterone nodes
+stcox hormone grade2 grade3 progesterone nodes
+
+
